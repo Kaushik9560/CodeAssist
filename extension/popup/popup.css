@@ -1,0 +1,125 @@
+:root {
+  color-scheme: dark;
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface-raised: #1d242d;
+  --border: #30363d;
+  --text: #f0f3f6;
+  --muted: #8b949e;
+  --accent: #d89a44;
+  --accent-strong: #f0ad4e;
+  --success: #4ac26b;
+  --danger: #f47067;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  width: 360px;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button { font: inherit; }
+
+.popup-shell { padding: 18px; }
+
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 18px;
+}
+
+.brand-mark {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid #5d451f;
+  background: #241b0e;
+  color: var(--accent-strong);
+  font-family: ui-monospace, "Cascadia Code", monospace;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.eyebrow {
+  margin: 0 0 3px;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+
+h1 { margin: 0; font-size: 16px; letter-spacing: -.01em; }
+
+.problem-card {
+  min-height: 116px;
+  margin-bottom: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.problem-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.platform-badge {
+  padding: 3px 7px;
+  border: 1px solid #4a4f57;
+  color: #c9d1d9;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.backend-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: #6e7681; }
+.backend-status[data-state="online"] .status-dot { background: var(--success); }
+.backend-status[data-state="offline"] .status-dot { background: var(--danger); }
+
+h2 {
+  margin: 13px 0 5px;
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.page-message, .popup-status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.primary-button, .secondary-button {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.primary-button { background: var(--accent-strong); color: #17120b; }
+.primary-button:hover:not(:disabled) { background: #ffc264; }
+.secondary-button { margin-top: 8px; border-color: var(--border); background: var(--surface-raised); color: var(--text); }
+.secondary-button:hover:not(:disabled) { border-color: #59616b; }
+button:disabled { cursor: not-allowed; opacity: .48; }
+.popup-status { margin-top: 10px; text-align: center; }
+.popup-status[data-tone="error"] { color: var(--danger); }
+.popup-status[data-tone="success"] { color: var(--success); }

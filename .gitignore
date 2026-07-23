@@ -1,0 +1,6 @@
+server/node_modules/
+server/.env
+server/coverage/
+*.log
+.DS_Store
+Thumbs.db

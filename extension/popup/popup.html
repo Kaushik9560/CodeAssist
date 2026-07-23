@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CodeAssist</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="popup-shell">
+      <header class="brand-row">
+        <div class="brand-mark" aria-hidden="true">CA</div>
+        <div>
+          <p class="eyebrow">CODEASSIST V5</p>
+          <h1>DSA Cognitive Coach</h1>
+        </div>
+      </header>
+
+      <section class="problem-card" aria-live="polite">
+        <div class="problem-meta">
+          <span id="platformBadge" class="platform-badge">Checking page</span>
+          <span id="backendStatus" class="backend-status" data-state="checking">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span id="backendStatusText">Backend check</span>
+          </span>
+        </div>
+        <h2 id="problemTitle">Reading current tab...</h2>
+        <p id="pageMessage" class="page-message"></p>
+      </section>
+
+      <button id="openCoachButton" class="primary-button" type="button">Open CodeAssist Coach</button>
+      <button id="quickBookmarkButton" class="secondary-button" type="button">Quick bookmark</button>
+      <p id="popupStatus" class="popup-status" role="status" hidden></p>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

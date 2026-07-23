@@ -1,0 +1,5 @@
+{
+  "name": "codeassist-extension",
+  "private": true,
+  "type": "module"
+}

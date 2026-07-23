@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CodeAssist Coach</title>
+    <link rel="stylesheet" href="sidepanel.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="app-header">
+        <div class="brand-lockup">
+          <span class="brand-mark" aria-hidden="true">CA</span>
+          <div>
+            <p class="eyebrow">CODEASSIST V5</p>
+            <h1>Cognitive Coach</h1>
+          </div>
+        </div>
+        <div id="backendIndicator" class="connection" data-state="checking" title="Backend status">
+          <span class="connection-dot" aria-hidden="true"></span>
+          <span id="backendIndicatorText">Checking</span>
+        </div>
+      </header>
+
+      <section class="problem-strip" aria-live="polite">
+        <div class="problem-strip-top">
+          <span id="currentPlatform" class="platform-tag">No problem</span>
+          <span id="currentDifficulty" class="difficulty-tag"></span>
+        </div>
+        <h2 id="currentProblemTitle">Open a supported problem page</h2>
+        <p id="contextNotice">LeetCode coaching and Codeforces bookmarks are supported.</p>
+      </section>
+
+      <nav class="section-tabs" aria-label="CodeAssist sections">
+        <button class="section-tab is-active" type="button" data-view="coachView">Coach</button>
+        <button class="section-tab" type="button" data-view="attemptView">Attempt</button>
+        <button class="section-tab" type="button" data-view="historyView">History</button>
+        <button class="section-tab" type="button" data-view="bookmarksView">Bookmarks</button>
+      </nav>
+
+      <main>
+        <section id="coachView" class="view is-active">
+          <div id="coachEmptyState" class="empty-state">
+            <p class="empty-kicker">COACH INACTIVE</p>
+            <h3>Open a LeetCode problem</h3>
+            <p>The coach reads the problem context only after you open a supported page.</p>
+          </div>
+
+          <div id="coachContent" hidden>
+            <section class="panel attempt-control">
+              <div>
+                <p class="panel-label">ACTIVE SESSION</p>
+                <strong id="attemptStateText">No attempt started</strong>
+              </div>
+              <span id="attemptTimer" class="timer">00:00</span>
+              <button id="startAttemptButton" class="primary-button compact" type="button">Start Attempt</button>
+            </section>
+
+            <section class="panel">
+              <div class="section-heading">
+                <div>
+                  <p class="panel-label">SOCRATIC LADDER</p>
+                  <h3>Progressive hints</h3>
+                </div>
+                <label class="language-control" for="responseLanguage">
+                  Coach language
+                  <select id="responseLanguage">
+                    <option value="hinglish">Simple Hinglish</option>
+                    <option value="english">English</option>
+                  </select>
+                </label>
+              </div>
+              <p class="section-description">Har level intentionally unlock hota hai. Levels 1-3 final solution reveal nahi karte.</p>
+              <div id="hintLadder" class="hint-ladder"></div>
+            </section>
+
+            <section class="panel backend-config">
+              <div>
+                <p class="panel-label">LOCAL SERVICE</p>
+                <h3>Backend URL</h3>
+              </div>
+              <label for="backendUrlInput">Express server address</label>
+              <div class="inline-field">
+                <input id="backendUrlInput" type="url" placeholder="http://localhost:8787">
+                <button id="saveBackendUrlButton" class="secondary-button compact" type="button">Save</button>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="section-heading">
+                <div>
+                  <p class="panel-label">COACH NOTES</p>
+                  <h3>Your hint trail</h3>
+                </div>
+              </div>
+              <div id="hintResults" class="hint-results">
+                <p class="muted-copy">Start an attempt, then request Level 1 when you are genuinely stuck.</p>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section id="attemptView" class="view">
+          <div id="attemptEmptyState" class="empty-state">
+            <p class="empty-kicker">NO ACTIVE ATTEMPT</p>
+            <h3>Start from the Coach tab</h3>
+            <p>Your timer, snapshots, notes, failed case and diagnosis will live here.</p>
+          </div>
+
+          <div id="attemptContent" hidden>
+            <section class="panel">
+              <div class="section-heading">
+                <div>
+                  <p class="panel-label">CURRENT WORK</p>
+                  <h3>Code snapshot</h3>
+                </div>
+                <span id="codeExtractionState" class="small-status">Manual paste available</span>
+              </div>
+              <label for="attemptLanguage">Programming language</label>
+              <input id="attemptLanguage" type="text" maxlength="100" placeholder="e.g. Java, C++, Python">
+              <label for="attemptCode">Current code</label>
+              <textarea id="attemptCode" class="code-input" spellcheck="false" maxlength="50000" placeholder="Extracted code appears here. If extraction fails, paste your code manually."></textarea>
+              <button id="captureCodeButton" class="secondary-button" type="button">Capture Code</button>
+            </section>
+
+            <section class="panel form-stack">
+              <div>
+                <p class="panel-label">YOUR EVIDENCE</p>
+                <h3>Thinking and failed case</h3>
+              </div>
+              <label for="attemptNotes">Notes or current thought</label>
+              <textarea id="attemptNotes" maxlength="10000" placeholder="What approach are you trying? Where are you unsure?"></textarea>
+              <label for="failedInput">Failed input</label>
+              <textarea id="failedInput" maxlength="10000" placeholder="Optional test input"></textarea>
+              <div class="two-column">
+                <label>Expected output
+                  <textarea id="expectedOutput" maxlength="10000"></textarea>
+                </label>
+                <label>Actual output
+                  <textarea id="actualOutput" maxlength="10000"></textarea>
+                </label>
+              </div>
+              <button id="analyzeAttemptButton" class="primary-button" type="button">Analyze My Attempt</button>
+            </section>
+
+            <section id="diagnosisPanel" class="panel" hidden>
+              <div>
+                <p class="panel-label">LEARNING DIAGNOSIS</p>
+                <h3>Attempt report</h3>
+              </div>
+              <div id="diagnosisResult"></div>
+              <p class="ai-notice">AI-generated learning feedback. Verify important technical conclusions.</p>
+              <div id="diagnosisFeedback" class="feedback-row" aria-label="Rate diagnosis accuracy"></div>
+            </section>
+
+            <section class="panel end-attempt">
+              <div>
+                <p class="panel-label">WRAP UP</p>
+                <h3>End this attempt</h3>
+              </div>
+              <select id="attemptEndStatus">
+                <option value="solved_independently">Solved independently</option>
+                <option value="solved_with_hints">Solved with hints</option>
+                <option value="not_solved">Not solved</option>
+                <option value="abandoned">Abandoned</option>
+              </select>
+              <button id="endAttemptButton" class="danger-button" type="button">End Attempt</button>
+            </section>
+          </div>
+        </section>
+
+        <section id="historyView" class="view">
+          <section class="panel">
+            <div>
+              <p class="panel-label">LOCAL INSIGHTS</p>
+              <h3>Your recurring patterns</h3>
+            </div>
+            <div id="insightsSummary" class="insights-grid"></div>
+          </section>
+          <section class="filter-bar" aria-label="History filters">
+            <select id="statusFilter" aria-label="Filter by status"><option value="">All statuses</option></select>
+            <select id="failureFilter" aria-label="Filter by failure"><option value="">All failures</option></select>
+            <select id="platformFilter" aria-label="Filter by platform"><option value="">All platforms</option><option value="leetcode">LeetCode</option><option value="codeforces">Codeforces</option></select>
+            <select id="hintsFilter" aria-label="Filter by hints"><option value="">Hints: any</option><option value="with">With hints</option><option value="without">Without hints</option></select>
+          </section>
+          <div id="historyList" class="card-list"></div>
+          <section id="historyDetail" class="panel report-detail" hidden></section>
+        </section>
+
+        <section id="bookmarksView" class="view">
+          <section id="bookmarkEditor" class="panel" hidden>
+            <div>
+              <p class="panel-label">CURRENT PROBLEM</p>
+              <h3 id="bookmarkEditorTitle">Bookmark details</h3>
+            </div>
+            <label for="bookmarkDifficulty">Custom difficulty</label>
+            <input id="bookmarkDifficulty" type="text" maxlength="100" placeholder="Easy, Medium, DP Hard...">
+            <label for="bookmarkNotes">Feedback / notes</label>
+            <textarea id="bookmarkNotes" maxlength="10000" placeholder="What did you learn?"></textarea>
+            <button id="saveBookmarkButton" class="primary-button" type="button">Save Bookmark</button>
+          </section>
+          <div class="list-heading">
+            <div>
+              <p class="panel-label">SAVED PROBLEMS</p>
+              <h3>Bookmarks</h3>
+            </div>
+            <button id="exportButton" class="secondary-button compact" type="button">Export Excel</button>
+          </div>
+          <div id="bookmarksList" class="card-list"></div>
+        </section>
+      </main>
+
+      <div id="globalStatus" class="global-status" role="status" hidden></div>
+    </div>
+    <script src="../vendor/xlsx.full.min.js"></script>
+    <script type="module" src="sidepanel.js"></script>
+  </body>
+</html>
