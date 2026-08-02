@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeAssist</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-shell">
+        <header class="app-header">
+            <div>
+                <p class="eyebrow">CodeAssist</p>
+                <h1>Track problems without leaving the page</h1>
+            </div>
+            <div class="header-note" id="headerNote">Gemini ready</div>
+        </header>
+
+        <nav class="tab-buttons" aria-label="Sections">
+            <button class="tab-btn active" data-tab="tab-problem" type="button">Problem</button>
+            <button class="tab-btn" data-tab="tab-library" type="button">Library</button>
+            <button class="tab-btn" data-tab="tab-settings" type="button">Settings</button>
+        </nav>
+
+        <main>
+            <section id="tab-problem" class="tab-content active">
+                <section class="card problem-card">
+                    <div class="problem-head">
+                        <div>
+                            <p class="section-label">Current page</p>
+                            <h2 class="problem-title" id="problemTitle">Loading problem...</h2>
+                        </div>
+                        <div class="problem-meta" id="problemMeta"></div>
+                    </div>
+                    <p class="problem-subtext" id="problemSubtext">Open a supported coding problem to save notes and ask for focused help.</p>
+                </section>
+
+                <div id="status" class="status-banner" hidden></div>
+
+                <form id="bookmarkForm" class="stack">
+                    <section class="card">
+                        <div class="two-col">
+                            <div class="field">
+                                <label for="status-select">Status</label>
+                                <select id="status-select">
+                                    <option value="unsolved">Not solved</option>
+                                    <option value="attempted">Attempted</option>
+                                    <option value="solved">Solved</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="difficulty">Difficulty</label>
+                                <input type="text" id="difficulty" placeholder="Easy, Medium, Hard">
+                            </div>
+                        </div>
+
+                        <div class="two-col">
+                            <div class="field">
+                                <label for="timeTaken">Time spent (minutes)</label>
+                                <input type="text" id="timeTaken" inputmode="numeric" placeholder="45">
+                            </div>
+                            <div class="field field-check">
+                                <label for="needsRevision">Revision</label>
+                                <label class="checkbox">
+                                    <input type="checkbox" id="needsRevision">
+                                    <span>Review this again later</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label for="tagInput">Tags</label>
+                            <input type="text" id="tagInput" placeholder="Type a tag and press Enter">
+                            <div class="tag-input-container" id="tagContainer"></div>
+                        </div>
+
+                        <div class="field">
+                            <label for="feedback">Notes</label>
+                            <textarea id="feedback" placeholder="Write the trick, edge case, or pattern you want to remember"></textarea>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" id="saveBtn">Save problem</button>
+                    </section>
+                </form>
+
+                <section class="card ai-card" id="ai-section">
+                    <div class="section-head">
+                        <div>
+                            <p class="section-label">Gemini help</p>
+                            <h3>Quick assistance</h3>
+                        </div>
+                        <p class="muted">Focused guidance, not full code dumps.</p>
+                    </div>
+
+                    <div class="ai-buttons">
+                        <button class="btn btn-secondary ai-btn" id="getHintsBtn" type="button">Hints</button>
+                        <button class="btn btn-secondary ai-btn" id="getComplexityBtn" type="button">Complexity</button>
+                        <button class="btn btn-secondary ai-btn" id="getApproachesBtn" type="button">Approaches</button>
+                        <button class="btn btn-secondary ai-btn" id="getConceptBtn" type="button">Concepts</button>
+                    </div>
+
+                    <div id="aiResult" class="result-panel">Choose an action to get a concise breakdown.</div>
+                </section>
+            </section>
+
+            <section id="tab-library" class="tab-content">
+                <section class="card stats-card">
+                    <div class="mini-stat">
+                        <span class="mini-stat-value" id="totalProblems">0</span>
+                        <span class="mini-stat-label">Saved</span>
+                    </div>
+                    <div class="mini-stat">
+                        <span class="mini-stat-value" id="solvedCount">0</span>
+                        <span class="mini-stat-label">Solved</span>
+                    </div>
+                    <div class="mini-stat">
+                        <span class="mini-stat-value" id="revisionCount">0</span>
+                        <span class="mini-stat-label">Revision</span>
+                    </div>
+                </section>
+
+                <section class="card">
+                    <div class="filter-row">
+                        <select id="platformFilter">
+                            <option value="all">All platforms</option>
+                            <option value="LeetCode">LeetCode</option>
+                            <option value="Codeforces">Codeforces</option>
+                            <option value="CodeChef">CodeChef</option>
+                            <option value="HackerRank">HackerRank</option>
+                            <option value="AtCoder">AtCoder</option>
+                            <option value="GeeksforGeeks">GeeksforGeeks</option>
+                        </select>
+                        <select id="statusFilter">
+                            <option value="all">All status</option>
+                            <option value="solved">Solved</option>
+                            <option value="attempted">Attempted</option>
+                            <option value="unsolved">Not solved</option>
+                        </select>
+                    </div>
+
+                    <div class="action-row">
+                        <button class="btn btn-secondary" id="exportBtn" type="button">Export Excel</button>
+                        <button class="btn btn-secondary" id="exportJsonBtn" type="button">Backup JSON</button>
+                    </div>
+
+                    <div class="bookmark-list" id="bookmarksList"></div>
+                </section>
+
+                <section class="card insights-card">
+                    <div class="section-head">
+                        <div>
+                            <p class="section-label">Patterns</p>
+                            <h3>What you are practicing</h3>
+                        </div>
+                    </div>
+                    <div id="platformStats" class="stack compact"></div>
+                    <div id="tagStats" class="tag-cloud"></div>
+                </section>
+            </section>
+
+            <section id="tab-settings" class="tab-content">
+                <section class="card">
+                    <div class="section-head">
+                        <div>
+                            <p class="section-label">Gemini API</p>
+                            <h3>Connection settings</h3>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label for="apiKey">API key</label>
+                        <input type="password" id="apiKey" placeholder="Paste your Gemini API key">
+                    </div>
+
+                    <div class="two-col">
+                        <div class="field">
+                            <label for="geminiModel">Model</label>
+                            <select id="geminiModel">
+                                <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
+                                <option value="gemini-flash-latest">Gemini Flash Latest</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="responseLanguage">Response style</label>
+                            <select id="responseLanguage">
+                                <option value="english">English</option>
+                                <option value="hinglish">Hinglish</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary" id="saveApiBtn" type="button">Save settings</button>
+                    <p class="helper-text">Get your key from Google AI Studio. The extension stores it locally in Chrome storage.</p>
+                </section>
+
+                <section class="card">
+                    <div class="section-head">
+                        <div>
+                            <p class="section-label">Notes</p>
+                            <h3>How this build works</h3>
+                        </div>
+                    </div>
+                    <ul class="notes-list">
+                        <li>Uses the current Gemini API flow and defaults to the stable `gemini-3.6-flash` model.</li>
+                        <li>Keeps responses concise so the popup feels useful instead of noisy.</li>
+                        <li>Preserves older saved bookmarks and upgrades them into the new storage key automatically.</li>
+                    </ul>
+                </section>
+
+                <section class="card danger-card">
+                    <div class="section-head">
+                        <div>
+                            <p class="section-label">Reset</p>
+                            <h3>Clear local extension data</h3>
+                        </div>
+                    </div>
+                    <button class="btn btn-danger" id="clearAllBtn" type="button">Clear all data</button>
+                </section>
+            </section>
+        </main>
+    </div>
+
+    <script src="xlsx.full.min.js"></script>
+    <script src="popup.js"></script>
+</body>
+</html>
