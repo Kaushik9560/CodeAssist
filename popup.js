@@ -1,547 +1,629 @@
-document.addEventListener("DOMContentLoaded", async () => {
-    const STORAGE_KEY = "problemBookmarks";
-    const LEGACY_STORAGE_KEY = "leetCodeBookmarks";
+document.addEventListener("DOMContentLoaded", () => init().catch(fatal));
+
+async function init() {
+    const BOOKMARKS = "problemBookmarks";
+    const LEGACY_BOOKMARKS = "leetCodeBookmarks";
     const DEFAULT_MODEL = "gemini-3.6-flash";
-    const SUPPORTED_SITES = [
-        { match: "leetcode.com/problems/", platform: "LeetCode", split: " - " },
-        { match: "codeforces.com/problemset/problem/", platform: "Codeforces", split: " - " },
-        { match: "codechef.com/problems/", platform: "CodeChef", split: " | " },
-        { match: "hackerrank.com/challenges/", platform: "HackerRank", split: " | " },
-        { match: "atcoder.jp/contests/", platform: "AtCoder", split: " - " },
-        { match: "geeksforgeeks.org/problems/", platform: "GeeksforGeeks", split: " | " }
-    ];
-
-    const elements = {
-        headerNote: document.getElementById("headerNote"),
-        problemTitle: document.getElementById("problemTitle"),
-        problemMeta: document.getElementById("problemMeta"),
-        problemSubtext: document.getElementById("problemSubtext"),
-        bookmarkForm: document.getElementById("bookmarkForm"),
-        statusBanner: document.getElementById("status"),
-        difficulty: document.getElementById("difficulty"),
-        feedback: document.getElementById("feedback"),
-        timeTaken: document.getElementById("timeTaken"),
-        statusSelect: document.getElementById("status-select"),
-        needsRevision: document.getElementById("needsRevision"),
-        saveBtn: document.getElementById("saveBtn"),
-        tagInput: document.getElementById("tagInput"),
-        tagContainer: document.getElementById("tagContainer"),
-        bookmarksList: document.getElementById("bookmarksList"),
-        platformFilter: document.getElementById("platformFilter"),
-        statusFilter: document.getElementById("statusFilter"),
-        totalProblems: document.getElementById("totalProblems"),
-        solvedCount: document.getElementById("solvedCount"),
-        revisionCount: document.getElementById("revisionCount"),
-        platformStats: document.getElementById("platformStats"),
-        tagStats: document.getElementById("tagStats"),
-        aiSection: document.getElementById("ai-section"),
-        aiResult: document.getElementById("aiResult"),
-        apiKey: document.getElementById("apiKey"),
-        geminiModel: document.getElementById("geminiModel"),
-        responseLanguage: document.getElementById("responseLanguage")
+    const $ = (id) => document.getElementById(id);
+    const ui = {
+        headerNote: $("headerNote"), status: $("status"), problemTitle: $("problemTitle"),
+        problemMeta: $("problemMeta"), problemSubtext: $("problemSubtext"),
+        form: $("bookmarkForm"), saveBtn: $("saveBtn"), difficulty: $("difficulty"),
+        notes: $("feedback"), time: $("timeTaken"), problemStatus: $("status-select"),
+        revision: $("needsRevision"), tagInput: $("tagInput"), tags: $("tagContainer"),
+        aiSection: $("ai-section"), aiOutput: $("aiOutput"), aiResult: $("aiResult"),
+        aiTitle: $("aiResultTitle"), copyAi: $("copyAiBtn"), retryAi: $("retryAiBtn"),
+        apiKey: $("apiKey"), model: $("geminiModel"), language: $("responseLanguage"),
+        apiStatus: $("apiStatus"), testApi: $("testApiBtn"), toggleKey: $("toggleApiKeyBtn"),
+        list: $("bookmarksList"), search: $("librarySearch"),
+        platformFilter: $("platformFilter"), statusFilter: $("statusFilter"),
+        total: $("totalProblems"), solved: $("solvedCount"), revisionCount: $("revisionCount"),
+        platformStats: $("platformStats"), tagStats: $("tagStats")
     };
+    const actions = {
+        getHintsBtn: ["getThinkingSteps", "Hints"],
+        getComplexityBtn: ["getComplexityAnalysis", "Complexity"],
+        getApproachesBtn: ["getApproaches", "Approaches"],
+        getConceptBtn: ["explainConcept", "Concepts"]
+    };
+    const sites = [
+        [/leetcode\.com\/problems\//i, "LeetCode"],
+        [/codeforces\.com\/(?:problemset\/problem|contest\/[^/]+\/problem)\//i, "Codeforces"],
+        [/codechef\.com\/(?:problems|[^/]+\/problems)\//i, "CodeChef"],
+        [/hackerrank\.com\/challenges\//i, "HackerRank"],
+        [/atcoder\.jp\/contests\/[^/]+\/tasks\//i, "AtCoder"],
+        [/geeksforgeeks\.org\/problems\//i, "GeeksforGeeks"]
+    ];
+    const state = { tags: [], bookmarks: [], tab: null, problem: null, lastAction: null, aiText: "", busy: false };
 
-    const tabButtons = [...document.querySelectorAll(".tab-btn")];
-    const tabContents = [...document.querySelectorAll(".tab-content")];
-
-    let currentTags = [];
-    let currentTabInfo = null;
-    let bookmarksCache = [];
-
-    await migrateLegacyBookmarks();
+    await migrateBookmarks();
     await loadSettings();
-    bindTabs();
-    bindTagEvents();
-    bindFilters();
-    bindAiButtons();
-    bindActionButtons();
-    await detectCurrentProblem();
-    await refreshLibraryView();
+    bindEvents();
+    activateTab("tab-problem");
+    await Promise.all([detectProblem(), refreshLibrary()]);
 
-    async function migrateLegacyBookmarks() {
-        const data = await chrome.storage.local.get({
-            [STORAGE_KEY]: null,
-            [LEGACY_STORAGE_KEY]: []
-        });
-
-        if (data[STORAGE_KEY] === null && data[LEGACY_STORAGE_KEY].length) {
-            await chrome.storage.local.set({ [STORAGE_KEY]: data[LEGACY_STORAGE_KEY] });
+    async function migrateBookmarks() {
+        const data = await chrome.storage.local.get({ [BOOKMARKS]: null, [LEGACY_BOOKMARKS]: [] });
+        if (data[BOOKMARKS] === null) {
+            await chrome.storage.local.set({ [BOOKMARKS]: Array.isArray(data[LEGACY_BOOKMARKS]) ? data[LEGACY_BOOKMARKS] : [] });
         }
     }
 
     async function loadSettings() {
         const data = await chrome.storage.local.get(["apiKey", "geminiModel", "responseLanguage"]);
-        elements.apiKey.value = data.apiKey || "";
-        elements.geminiModel.value = data.geminiModel || DEFAULT_MODEL;
-        elements.responseLanguage.value = data.responseLanguage || "english";
-        elements.headerNote.textContent = data.apiKey ? "Gemini connected" : "Add Gemini API key";
+        ui.apiKey.value = data.apiKey || "";
+        ui.apiKey.type = "password";
+        ui.toggleKey.textContent = "Show";
+        ui.toggleKey.setAttribute("aria-pressed", "false");
+        const model = [...ui.model.options].some((option) => option.value === data.geminiModel)
+            ? data.geminiModel : DEFAULT_MODEL;
+        ui.model.value = model;
+        ui.language.value = data.responseLanguage || "english";
+        if (data.geminiModel && data.geminiModel !== model) await chrome.storage.local.set({ geminiModel: model });
+        connection(data.apiKey ? "saved" : "missing");
+        apiMessage(data.apiKey ? "Key saved. Test it to verify the connection." : "Add a Gemini API key to enable help.");
     }
 
-    function bindTabs() {
-        tabButtons.forEach((button) => {
-            button.addEventListener("click", () => {
-                tabButtons.forEach((tab) => tab.classList.remove("active"));
-                tabContents.forEach((content) => content.classList.remove("active"));
-                button.classList.add("active");
-                document.getElementById(button.dataset.tab).classList.add("active");
+    function bindEvents() {
+        const tabs = [...document.querySelectorAll(".tab-btn")];
+        tabs.forEach((button, index) => {
+            button.addEventListener("click", () => activateTab(button.dataset.tab));
+            button.addEventListener("keydown", (event) => {
+                if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+                event.preventDefault();
+                const step = event.key === "ArrowRight" ? 1 : -1;
+                const next = tabs[(index + step + tabs.length) % tabs.length];
+                activateTab(next.dataset.tab);
+                next.focus();
             });
         });
-    }
 
-    function bindTagEvents() {
-        elements.tagInput.addEventListener("keydown", (event) => {
-            if (event.key !== "Enter") {
-                return;
-            }
-
+        ui.form.addEventListener("submit", saveProblem);
+        ui.tagInput.addEventListener("keydown", (event) => {
+            if (!["Enter", ","].includes(event.key)) return;
             event.preventDefault();
-            const value = elements.tagInput.value.trim();
-            if (!value || currentTags.includes(value)) {
-                elements.tagInput.value = "";
-                return;
-            }
-
-            currentTags.push(value);
-            elements.tagInput.value = "";
+            addTag(ui.tagInput.value);
+        });
+        ui.tags.addEventListener("click", (event) => {
+            const button = event.target.closest("[data-tag]");
+            if (!button) return;
+            state.tags = state.tags.filter((tag) => tag !== decodeURIComponent(button.dataset.tag));
             renderTags();
         });
 
-        elements.tagContainer.addEventListener("click", (event) => {
-            const tag = event.target.dataset.tag;
-            if (!tag) {
-                return;
-            }
-
-            currentTags = currentTags.filter((item) => item !== tag);
-            renderTags();
+        Object.entries(actions).forEach(([id, [action, label]]) => {
+            $(id).addEventListener("click", () => askGemini(action, label));
         });
+        ui.copyAi.addEventListener("click", copyAnswer);
+        ui.retryAi.addEventListener("click", () => state.lastAction && askGemini(...state.lastAction));
+
+        $("saveApiBtn").addEventListener("click", saveSettings);
+        ui.testApi.addEventListener("click", testConnection);
+        ui.toggleKey.addEventListener("click", toggleKey);
+        [ui.apiKey, ui.model, ui.language].forEach((control) => control.addEventListener("change", () => {
+            connection(ui.apiKey.value.trim() ? "saved" : "missing");
+            apiMessage("Settings changed. Save or test the connection.");
+        }));
+
+        [ui.platformFilter, ui.statusFilter].forEach((filter) => filter.addEventListener("change", renderBookmarks));
+        ui.search.addEventListener("input", renderBookmarks);
+        ui.list.addEventListener("click", deleteProblem);
+        $("exportBtn").addEventListener("click", exportExcel);
+        $("exportJsonBtn").addEventListener("click", exportJson);
+        $("clearAllBtn").addEventListener("click", clearData);
     }
 
-    function bindFilters() {
-        [elements.platformFilter, elements.statusFilter].forEach((filter) => {
-            filter.addEventListener("change", () => {
-                renderBookmarks();
+    function activateTab(id) {
+        document.querySelectorAll(".tab-btn").forEach((button) => {
+            const active = button.dataset.tab === id;
+            button.classList.toggle("active", active);
+            button.setAttribute("aria-selected", String(active));
+            button.tabIndex = active ? 0 : -1;
+        });
+        document.querySelectorAll(".tab-content").forEach((panel) => {
+            const active = panel.id === id;
+            panel.classList.toggle("active", active);
+            panel.hidden = !active;
+        });
+        window.scrollTo(0, 0);
+    }
+
+    async function saveSettings() {
+        const apiKey = ui.apiKey.value.trim();
+        if (!apiKey) return apiMessage("Enter an API key first.", "error");
+        await chrome.storage.local.set({ apiKey, geminiModel: ui.model.value, responseLanguage: ui.language.value });
+        connection("saved");
+        apiMessage("Settings saved. Test the connection when the key changes.", "success");
+        toast("Gemini settings saved.");
+    }
+
+    async function testConnection() {
+        const apiKey = ui.apiKey.value.trim();
+        if (!apiKey) return apiMessage("Enter an API key first.", "error");
+        const label = ui.testApi.textContent;
+        ui.testApi.disabled = true;
+        ui.testApi.textContent = "Testing…";
+        apiMessage("Checking the key and model…", "loading");
+        try {
+            const result = await chrome.runtime.sendMessage({
+                action: "testGeminiConnection",
+                payload: { apiKey, model: ui.model.value }
             });
-        });
+            if (!result?.ok) throw new Error(result?.error || "Connection failed.");
+            connection("connected");
+            apiMessage(`Connected to ${modelName(result.model || ui.model.value)}. Save settings to use it.`, "success");
+        } catch (error) {
+            connection("error");
+            apiMessage(errorText(error), "error");
+        } finally {
+            ui.testApi.disabled = false;
+            ui.testApi.textContent = label;
+        }
     }
 
-    function bindAiButtons() {
-        const mapping = {
-            getHintsBtn: "getThinkingSteps",
-            getComplexityBtn: "getComplexityAnalysis",
-            getApproachesBtn: "getApproaches",
-            getConceptBtn: "explainConcept"
-        };
-
-        Object.entries(mapping).forEach(([id, action]) => {
-            document.getElementById(id).addEventListener("click", async () => {
-                await requestAiHelp(action);
-            });
-        });
+    function toggleKey() {
+        const visible = ui.apiKey.type === "password";
+        ui.apiKey.type = visible ? "text" : "password";
+        ui.toggleKey.textContent = visible ? "Hide" : "Show";
+        ui.toggleKey.setAttribute("aria-pressed", String(visible));
     }
 
-    function bindActionButtons() {
-        elements.bookmarkForm.addEventListener("submit", async (event) => {
-            event.preventDefault();
-            await saveCurrentProblem();
-        });
-
-        document.getElementById("saveApiBtn").addEventListener("click", async () => {
-            const apiKey = elements.apiKey.value.trim();
-            const geminiModel = elements.geminiModel.value;
-            const responseLanguage = elements.responseLanguage.value;
-
-            if (!apiKey) {
-                showStatus("Enter a Gemini API key first.", true);
-                return;
-            }
-
-            await chrome.storage.local.set({ apiKey, geminiModel, responseLanguage });
-            elements.headerNote.textContent = "Gemini connected";
-            showStatus("Gemini settings saved.");
-        });
-
-        document.getElementById("clearAllBtn").addEventListener("click", async () => {
-            if (!confirm("This will clear saved problems and local settings. Continue?")) {
-                return;
-            }
-
-            await chrome.storage.local.clear();
-            currentTags = [];
-            renderTags();
-            await loadSettings();
-            await refreshLibraryView();
-            showStatus("Local extension data cleared.");
-        });
-
-        document.getElementById("exportBtn").addEventListener("click", exportExcel);
-        document.getElementById("exportJsonBtn").addEventListener("click", exportJson);
-
-        elements.bookmarksList.addEventListener("click", async (event) => {
-            const deleteButton = event.target.closest("[data-delete-url]");
-            if (!deleteButton) {
-                return;
-            }
-
-            const targetUrl = deleteButton.dataset.deleteUrl;
-            if (!confirm("Delete this saved problem?")) {
-                return;
-            }
-
-            const bookmarks = await getBookmarks();
-            const updated = bookmarks.filter((item) => item.url !== targetUrl);
-            await setBookmarks(updated);
-            await refreshLibraryView();
-            showStatus("Saved problem deleted.");
-        });
+    function connection(status) {
+        ui.headerNote.dataset.state = status;
+        ui.headerNote.className = `connection-state ${status === "connected" ? "is-connected" : status === "error" ? "is-error" : ""}`.trim();
+        ui.headerNote.textContent = ({ connected: "Gemini connected", saved: "Key saved", error: "Connection issue" })[status] || "Setup required";
     }
 
-    async function detectCurrentProblem() {
+    function apiMessage(message, type = "") {
+        ui.apiStatus.className = `api-status ${type}`.trim();
+        ui.apiStatus.textContent = message;
+    }
+
+    async function detectProblem() {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        const match = tab?.url
-            ? SUPPORTED_SITES.find((item) => tab.url.includes(item.match))
-            : null;
-
-        if (!match || !tab) {
-            currentTabInfo = null;
-            elements.problemTitle.textContent = "Unsupported page";
-            elements.problemMeta.innerHTML = '<span class="badge">Open LeetCode, Codeforces, CodeChef, HackerRank, AtCoder, or GeeksforGeeks</span>';
-            elements.problemSubtext.textContent = "The assistant works on supported coding-problem pages only.";
-            elements.bookmarkForm.hidden = true;
-            elements.aiSection.hidden = true;
+        const site = tab?.url && sites.find(([pattern]) => pattern.test(tab.url));
+        if (!site) {
+            state.tab = null;
+            ui.problemTitle.textContent = "Open a coding problem";
+            ui.problemSubtext.textContent = "Supported: LeetCode, Codeforces, CodeChef, HackerRank, AtCoder, and GeeksforGeeks.";
+            ui.problemMeta.innerHTML = '<span class="badge">No problem detected</span>';
+            ui.form.hidden = true;
+            ui.aiSection.hidden = true;
             return;
         }
 
-        const titleParts = tab.title.split(match.split);
-        const cleanedTitle = match.platform === "Codeforces" && titleParts.length > 1
-            ? titleParts[1]
-            : titleParts[0];
-
-        currentTabInfo = {
-            title: cleanedTitle.trim(),
-            url: tab.url,
-            platform: match.platform
+        state.tab = {
+            id: tab.id,
+            url: normalizeUrl(tab.url),
+            platform: site[1],
+            title: cleanTitle(tab.title, site[1], tab.url)
         };
+        ui.form.hidden = false;
+        ui.aiSection.hidden = false;
+        ui.problemTitle.textContent = state.tab.title;
+        ui.problemSubtext.textContent = "Ask for a nudge, then save the insight you want to remember.";
+        problemBadges("unsolved");
+        aiState("idle");
 
-        elements.problemTitle.textContent = currentTabInfo.title;
-        elements.problemSubtext.textContent = "Keep a clean record of your approach, then ask Gemini only for the help you need.";
-        renderProblemMeta("unsolved");
+        try {
+            state.problem = await readProblem(tab.id);
+            if (state.problem?.title) {
+                state.tab.title = state.problem.title;
+                ui.problemTitle.textContent = state.tab.title;
+            }
+        } catch (error) {
+            console.info("Problem text will be retried on request:", error);
+        }
 
-        const bookmarks = await getBookmarks();
-        const existing = bookmarks.find((item) => item.url === currentTabInfo.url);
-        if (existing) {
-            loadBookmark(existing);
-        } else {
-            setSaveMode("save");
+        const saved = (await getBookmarks()).find((item) => normalizeUrl(item.url) === state.tab.url);
+        saved ? loadProblem(saved) : resetForm();
+    }
+
+    async function readProblem(tabId) {
+        try {
+            return await chrome.tabs.sendMessage(tabId, { action: "getProblemContent" });
+        } catch {
+            try {
+                await chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] });
+                return await chrome.tabs.sendMessage(tabId, { action: "getProblemContent" });
+            } catch {
+                throw new Error("Could not read this page. Refresh the problem page and retry.");
+            }
         }
     }
 
-    function renderProblemMeta(status) {
-        const badges = [`<span class="badge">${currentTabInfo.platform}</span>`];
-        if (status === "solved") {
-            badges.push('<span class="badge solved">Solved</span>');
-        } else if (status === "attempted") {
-            badges.push('<span class="badge attempted">Attempted</span>');
-        }
-        elements.problemMeta.innerHTML = badges.join("");
+    function problemBadges(status) {
+        ui.problemMeta.innerHTML = `<span class="badge">${escapeHtml(state.tab.platform)}</span><span class="badge ${status}">${statusLabel(status)}</span>`;
     }
 
-    function loadBookmark(bookmark) {
-        elements.difficulty.value = bookmark.difficulty || "";
-        elements.feedback.value = bookmark.feedback || "";
-        elements.timeTaken.value = bookmark.timeTaken || "";
-        elements.statusSelect.value = bookmark.status || "unsolved";
-        elements.needsRevision.checked = Boolean(bookmark.needsRevision);
-        currentTags = [...(bookmark.tags || [])];
+    function loadProblem(item) {
+        const status = ["unsolved", "attempted", "solved"].includes(item.status) ? item.status : "unsolved";
+        setDifficulty(item.difficulty);
+        ui.notes.value = item.feedback || "";
+        ui.time.value = item.timeTaken || "";
+        ui.problemStatus.value = status;
+        ui.revision.checked = Boolean(item.needsRevision);
+        state.tags = [...new Set(item.tags || [])];
         renderTags();
-        renderProblemMeta(bookmark.status);
-        setSaveMode("update");
+        problemBadges(status);
+        saveMode("update");
     }
 
-    function setSaveMode(mode) {
-        elements.saveBtn.dataset.mode = mode;
-        elements.saveBtn.textContent = mode === "update" ? "Update problem" : "Save problem";
+    function resetForm() {
+        ui.form.reset();
+        ui.difficulty.querySelector("[data-legacy]")?.remove();
+        ui.problemStatus.value = "unsolved";
+        state.tags = [];
+        renderTags();
+        if (state.tab) problemBadges("unsolved");
+        saveMode("save");
+    }
+
+    function setDifficulty(value) {
+        ui.difficulty.querySelector("[data-legacy]")?.remove();
+        const match = [...ui.difficulty.options].find((option) => option.value.toLowerCase() === String(value || "").toLowerCase());
+        if (match || !value) return void (ui.difficulty.value = match?.value || "");
+        const option = new Option(value, value);
+        option.dataset.legacy = "true";
+        ui.difficulty.add(option);
+        ui.difficulty.value = value;
+    }
+
+    function saveMode(mode) {
+        ui.saveBtn.dataset.mode = mode;
+        ui.saveBtn.textContent = mode === "update" ? "Update problem" : "Save problem";
+    }
+
+    function addTag(raw) {
+        const tag = String(raw || "").replace(/,$/, "").trim();
+        ui.tagInput.value = "";
+        if (!tag || state.tags.some((item) => item.toLowerCase() === tag.toLowerCase())) return;
+        state.tags.push(tag);
+        renderTags();
     }
 
     function renderTags() {
-        elements.tagContainer.innerHTML = "";
-        currentTags.forEach((tag) => {
-            const item = document.createElement("span");
-            item.className = "tag";
-            item.innerHTML = `${escapeHtml(tag)} <button type="button" data-tag="${escapeAttribute(tag)}" aria-label="Remove ${escapeAttribute(tag)}">x</button>`;
-            elements.tagContainer.appendChild(item);
-        });
+        ui.tags.innerHTML = state.tags.map((tag) => `<span class="tag">${escapeHtml(tag)}<button type="button" data-tag="${encodeURIComponent(tag)}" aria-label="Remove ${escapeHtml(tag)}">×</button></span>`).join("");
     }
 
-    async function saveCurrentProblem() {
-        if (!currentTabInfo) {
-            showStatus("Open a supported problem page first.", true);
-            return;
-        }
-
-        const bookmarks = await getBookmarks();
-        const mode = elements.saveBtn.dataset.mode || "save";
-        const existing = bookmarks.find((item) => item.url === currentTabInfo.url);
-        const createdAt = existing?.createdAt || new Date().toISOString();
-
-        const record = {
-            ...currentTabInfo,
-            difficulty: elements.difficulty.value.trim(),
-            feedback: elements.feedback.value.trim(),
-            timeTaken: elements.timeTaken.value.trim(),
-            status: elements.statusSelect.value,
-            needsRevision: elements.needsRevision.checked,
-            tags: currentTags,
-            createdAt,
+    async function saveProblem(event) {
+        event.preventDefault();
+        if (!state.tab) return toast("Open a supported problem first.", true);
+        addTag(ui.tagInput.value);
+        const minutes = ui.time.value.trim();
+        if (minutes && !/^\d+$/.test(minutes)) return toast("Enter time as minutes.", true);
+        const items = await getBookmarks();
+        const old = items.find((item) => normalizeUrl(item.url) === state.tab.url);
+        const item = {
+            title: state.tab.title, url: state.tab.url, platform: state.tab.platform,
+            status: ui.problemStatus.value, difficulty: ui.difficulty.value,
+            timeTaken: minutes, needsRevision: ui.revision.checked,
+            tags: [...state.tags], feedback: ui.notes.value.trim(),
+            createdAt: old?.createdAt || old?.date || new Date().toISOString(),
             updatedAt: new Date().toISOString()
         };
-
-        const updatedBookmarks = mode === "update"
-            ? bookmarks.map((item) => item.url === currentTabInfo.url ? record : item)
-            : [...bookmarks, record];
-
-        await setBookmarks(updatedBookmarks);
-        renderProblemMeta(record.status);
-        setSaveMode("update");
-        await refreshLibraryView();
-        showStatus(mode === "update" ? "Problem updated." : "Problem saved.");
+        await setBookmarks(old
+            ? items.map((saved) => normalizeUrl(saved.url) === state.tab.url ? item : saved)
+            : [...items, item]);
+        problemBadges(item.status);
+        saveMode("update");
+        await refreshLibrary();
+        toast(old ? "Problem updated." : "Problem saved.");
     }
 
-    async function refreshLibraryView() {
-        bookmarksCache = await getBookmarks();
-        updateStats();
+    async function refreshLibrary() {
+        state.bookmarks = await getBookmarks();
+        ui.total.textContent = state.bookmarks.length;
+        ui.solved.textContent = state.bookmarks.filter((item) => item.status === "solved").length;
+        ui.revisionCount.textContent = state.bookmarks.filter((item) => item.needsRevision).length;
         renderBookmarks();
         renderInsights();
     }
 
-    function updateStats() {
-        elements.totalProblems.textContent = String(bookmarksCache.length);
-        elements.solvedCount.textContent = String(bookmarksCache.filter((item) => item.status === "solved").length);
-        elements.revisionCount.textContent = String(bookmarksCache.filter((item) => item.needsRevision).length);
-    }
-
     function renderBookmarks() {
-        const platformValue = elements.platformFilter.value;
-        const statusValue = elements.statusFilter.value;
+        const query = ui.search.value.trim().toLowerCase();
+        const items = state.bookmarks
+            .filter((item) => ui.platformFilter.value === "all" || item.platform === ui.platformFilter.value)
+            .filter((item) => ui.statusFilter.value === "all" || (item.status || "unsolved") === ui.statusFilter.value)
+            .filter((item) => !query || [item.title, item.feedback, item.difficulty, ...(item.tags || [])]
+                .some((value) => String(value || "").toLowerCase().includes(query)))
+            .sort((a, b) => new Date(b.updatedAt || b.date || 0) - new Date(a.updatedAt || a.date || 0));
 
-        let filtered = [...bookmarksCache];
-        if (platformValue !== "all") {
-            filtered = filtered.filter((item) => item.platform === platformValue);
-        }
-        if (statusValue !== "all") {
-            filtered = filtered.filter((item) => item.status === statusValue);
-        }
-
-        filtered.sort((a, b) => new Date(b.updatedAt || b.date || 0) - new Date(a.updatedAt || a.date || 0));
-        elements.bookmarksList.innerHTML = "";
-
-        if (!filtered.length) {
-            elements.bookmarksList.innerHTML = '<div class="empty-state">No saved problems match these filters yet.</div>';
+        if (!items.length) {
+            ui.list.innerHTML = `<div class="empty-state"><strong>${state.bookmarks.length ? "No matches" : "Your library is empty"}</strong><span>${state.bookmarks.length ? "Try another search or filter." : "Save a problem to start your revision queue."}</span></div>`;
             return;
         }
 
-        filtered.forEach((bookmark) => {
-            const item = document.createElement("article");
-            item.className = "bookmark-item";
-            item.innerHTML = `
-                <div>
-                    <h4><a class="bookmark-link" href="${escapeAttribute(bookmark.url)}" target="_blank" rel="noreferrer">${escapeHtml(bookmark.title)}</a></h4>
-                    <p class="bookmark-meta">${escapeHtml(bookmark.platform)}${bookmark.difficulty ? ` | ${escapeHtml(bookmark.difficulty)}` : ""}${bookmark.timeTaken ? ` | ${escapeHtml(bookmark.timeTaken)} min` : ""}</p>
-                    <p class="bookmark-notes">${escapeHtml(bookmark.feedback || "No notes yet.")}</p>
+        ui.list.innerHTML = items.map((item) => {
+            const status = ["solved", "attempted"].includes(item.status) ? item.status : "unsolved";
+            const meta = [item.difficulty, item.timeTaken && `${item.timeTaken} min`].filter(Boolean).join(" · ");
+            const tags = (item.tags || []).slice(0, 4).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("");
+            return `<article class="bookmark-item">
+                <div class="bookmark-content">
+                    <div class="bookmark-topline"><span class="badge">${escapeHtml(item.platform || "Unknown")}</span><span class="badge ${status}">${statusLabel(status)}</span>${item.needsRevision ? '<span class="badge revision">Revision</span>' : ""}</div>
+                    <h4><a class="bookmark-link" href="${safeUrl(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.title || "Untitled problem")}</a></h4>
+                    ${meta ? `<p class="bookmark-meta">${escapeHtml(meta)}</p>` : ""}
+                    ${item.feedback ? `<p class="bookmark-notes">${escapeHtml(item.feedback)}</p>` : ""}
+                    ${tags ? `<div class="bookmark-tags">${tags}</div>` : ""}
                 </div>
-                <div class="bookmark-actions">
-                    <span class="badge ${bookmark.status === "solved" ? "solved" : bookmark.status === "attempted" ? "attempted" : ""}">${formatStatus(bookmark.status)}</span>
-                    <button class="btn btn-danger" type="button" data-delete-url="${escapeAttribute(bookmark.url)}">Delete</button>
-                </div>
-            `;
-            elements.bookmarksList.appendChild(item);
-        });
+                <button class="bookmark-delete" type="button" data-delete="${encodeURIComponent(normalizeUrl(item.url))}" aria-label="Delete ${escapeHtml(item.title || "problem")}">×</button>
+            </article>`;
+        }).join("");
+    }
+
+    async function deleteProblem(event) {
+        const button = event.target.closest("[data-delete]");
+        if (!button || !confirm("Delete this saved problem?")) return;
+        const url = decodeURIComponent(button.dataset.delete);
+        await setBookmarks((await getBookmarks()).filter((item) => normalizeUrl(item.url) !== url));
+        if (state.tab?.url === url) resetForm();
+        await refreshLibrary();
+        toast("Saved problem deleted.");
     }
 
     function renderInsights() {
-        elements.platformStats.innerHTML = "";
-        elements.tagStats.innerHTML = "";
-
-        if (!bookmarksCache.length) {
-            elements.platformStats.innerHTML = '<div class="empty-state">Save a few problems to see your platform mix.</div>';
+        if (!state.bookmarks.length) {
+            ui.platformStats.innerHTML = '<div class="empty-state compact-empty">Practice patterns will appear here.</div>';
+            ui.tagStats.innerHTML = "";
             return;
         }
-
-        const platformCounts = bookmarksCache.reduce((accumulator, item) => {
-            accumulator[item.platform] = (accumulator[item.platform] || 0) + 1;
-            return accumulator;
-        }, {});
-
-        Object.entries(platformCounts).forEach(([platform, count]) => {
-            const percent = Math.round((count / bookmarksCache.length) * 100);
-            const row = document.createElement("div");
-            row.className = "progress-row";
-            row.innerHTML = `
-                <div class="progress-label">
-                    <span>${escapeHtml(platform)}</span>
-                    <span>${count} - ${percent}%</span>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: ${percent}%"></div>
-                </div>
-            `;
-            elements.platformStats.appendChild(row);
-        });
-
-        const tagCounts = bookmarksCache.reduce((accumulator, item) => {
-            (item.tags || []).forEach((tag) => {
-                accumulator[tag] = (accumulator[tag] || 0) + 1;
-            });
-            return accumulator;
-        }, {});
-
-        const sortedTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 12);
-        if (!sortedTags.length) {
-            elements.tagStats.innerHTML = '<div class="empty-state">No tags yet.</div>';
-            return;
-        }
-
-        sortedTags.forEach(([tag, count]) => {
-            const chip = document.createElement("span");
-            chip.className = "tag";
-            chip.textContent = `${tag} ${count}`;
-            elements.tagStats.appendChild(chip);
-        });
+        const platforms = countBy(state.bookmarks.map((item) => item.platform || "Unknown"));
+        ui.platformStats.innerHTML = Object.entries(platforms).sort((a, b) => b[1] - a[1]).map(([name, count]) => {
+            const percent = Math.round(count / state.bookmarks.length * 100);
+            return `<div class="progress-row"><div class="progress-label"><span>${escapeHtml(name)}</span><span>${count} · ${percent}%</span></div><div class="progress-bar"><span style="width:${percent}%"></span></div></div>`;
+        }).join("");
+        const tags = countBy(state.bookmarks.flatMap((item) => item.tags || []));
+        ui.tagStats.innerHTML = Object.entries(tags).sort((a, b) => b[1] - a[1]).slice(0, 12)
+            .map(([tag, count]) => `<span class="tag">${escapeHtml(tag)} ${count}</span>`).join("");
     }
 
-    async function requestAiHelp(action) {
-        if (!currentTabInfo) {
-            showStatus("Open a supported problem page first.", true);
-            return;
+    async function askGemini(action, label) {
+        if (state.busy || !state.tab) return;
+        const { apiKey } = await chrome.storage.local.get("apiKey");
+        if (!apiKey?.trim()) {
+            aiState("error", "Gemini setup required", "Add an API key in Settings first.");
+            activateTab("tab-settings");
+            return ui.apiKey.focus();
         }
-
-        elements.aiResult.textContent = "Reading the problem and asking Gemini...";
-
+        state.busy = true;
+        state.lastAction = [action, label];
+        setAiButtons(true);
+        aiState("loading", `Preparing ${label}`);
         try {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            const problemData = await chrome.tabs.sendMessage(tab.id, { action: "getProblemContent" });
-
-            if (!problemData?.content) {
-                throw new Error("Could not read the problem statement from this page.");
+            if (!tab?.id || normalizeUrl(tab.url) !== state.tab.url) throw new Error("The active tab changed. Reopen CodeAssist on the problem.");
+            state.problem = await readProblem(tab.id);
+            if (!state.problem?.content) throw new Error("The problem statement is not ready. Wait a moment and retry.");
+            if (state.problem.title) {
+                state.tab.title = state.problem.title;
+                ui.problemTitle.textContent = state.tab.title;
             }
-
-            const response = await chrome.runtime.sendMessage({
+            const result = await chrome.runtime.sendMessage({
                 action,
                 payload: {
-                    title: currentTabInfo.title,
-                    platform: currentTabInfo.platform,
-                    content: problemData.content,
-                    examples: problemData.examples || [],
-                    constraints: problemData.constraints || ""
+                    title: state.tab.title, platform: state.tab.platform, content: state.problem.content,
+                    examples: state.problem.examples || [], constraints: state.problem.constraints || ""
                 }
             });
-
-            if (!response?.ok) {
-                throw new Error(response?.error || "Gemini did not return a usable response.");
-            }
-
-            elements.aiResult.textContent = response.text;
+            if (!result?.ok) throw new Error(result?.error || "Gemini returned no response.");
+            state.aiText = normalizeMath(result.text);
+            connection("connected");
+            aiState("success", label, state.aiText);
         } catch (error) {
-            elements.aiResult.textContent = error.message;
+            aiState("error", "Could not get a response", errorText(error));
+        } finally {
+            state.busy = false;
+            setAiButtons(false);
         }
+    }
+
+    function aiState(type, title = "Ready when you are", message = "") {
+        ui.aiResult.dataset.state = type;
+        ui.aiOutput.setAttribute("aria-busy", String(type === "loading"));
+        ui.copyAi.hidden = type !== "success";
+        ui.retryAi.hidden = type !== "error" || !state.lastAction;
+        ui.aiTitle.textContent = title;
+        if (type === "success") return void (ui.aiResult.innerHTML = renderAnswer(message));
+        if (type === "loading") return void (ui.aiResult.innerHTML = '<div class="ai-message"><span class="spinner"></span><div><strong>Reading the problem</strong><p>Preparing focused guidance…</p></div></div>');
+        if (type === "error") return void (ui.aiResult.innerHTML = `<div class="ai-message ai-error"><b>!</b><div><strong>Request failed</strong><p>${escapeHtml(message)}</p></div></div>`);
+        state.aiText = "";
+        ui.aiTitle.textContent = "Ready when you are";
+        ui.aiResult.innerHTML = '<div class="ai-message"><b>✦</b><div><strong>Choose the help you need</strong><p>Concise guidance without a full solution dump.</p></div></div>';
+    }
+
+    function renderAnswer(text) {
+        const lines = text.replace(/\r/g, "").split("\n");
+        let html = "", list = "", code = false;
+        const closeList = () => { if (list) { html += `</${list}>`; list = ""; } };
+        for (const raw of lines) {
+            const line = raw.trim();
+            if (line.startsWith("```")) { closeList(); html += code ? "</code></pre>" : "<pre><code>"; code = !code; continue; }
+            if (code) { html += `${escapeHtml(raw)}\n`; continue; }
+            if (!line) { closeList(); continue; }
+            const heading = line.match(/^#{1,4}\s+(.+)$/) || line.match(/^\*\*([^*]+)\*\*:?$/);
+            if (heading || (line.endsWith(":") && line.length < 65)) {
+                closeList(); html += `<h4>${inline(heading?.[1] || line.slice(0, -1))}</h4>`; continue;
+            }
+            const bullet = line.match(/^[-*•]\s+(.+)$/), number = line.match(/^\d+[.)]\s+(.+)$/);
+            if (bullet || number) {
+                const type = bullet ? "ul" : "ol";
+                if (list !== type) { closeList(); list = type; html += `<${type}>`; }
+                html += `<li>${inline(bullet?.[1] || number[1])}</li>`; continue;
+            }
+            closeList(); html += `<p>${inline(line)}</p>`;
+        }
+        closeList();
+        if (code) html += "</code></pre>";
+        return html;
+    }
+
+    function inline(value) {
+        return escapeHtml(value)
+            .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+            .replace(/`([^`]+)`/g, "<code>$1</code>");
+    }
+
+    function setAiButtons(disabled) {
+        Object.keys(actions).forEach((id) => { $(id).disabled = disabled; });
+    }
+
+    async function copyAnswer() {
+        try {
+            await navigator.clipboard.writeText(state.aiText);
+            toast("Gemini response copied.");
+        } catch { toast("Could not copy the response.", true); }
     }
 
     async function exportExcel() {
-        const bookmarks = await getBookmarks();
-        if (!bookmarks.length) {
-            showStatus("No saved problems to export.", true);
-            return;
-        }
-
-        const rows = bookmarks.map((item) => [
-            { v: item.title, l: { Target: item.url } },
-            item.platform,
-            item.status || "unsolved",
-            item.difficulty || "",
-            item.timeTaken || "",
-            (item.tags || []).join(", "),
-            item.feedback || "",
-            new Date(item.updatedAt || item.createdAt || item.date).toLocaleDateString()
-        ]);
-
-        const sheet = XLSX.utils.aoa_to_sheet([[
-            "Title",
-            "Platform",
-            "Status",
-            "Difficulty",
-            "Time Spent",
-            "Tags",
-            "Notes",
-            "Last Updated"
-        ]]);
-        XLSX.utils.sheet_add_aoa(sheet, rows, { origin: "A2" });
-
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, sheet, "Problems");
-        XLSX.writeFile(workbook, "codeassist-bookmarks.xlsx");
+        if (!state.bookmarks.length) return toast("No saved problems to export.", true);
+        const button = $("exportBtn"), label = button.textContent;
+        button.disabled = true;
+        button.textContent = "Preparing…";
+        try {
+            await loadXlsx();
+            const rows = state.bookmarks.map((item) => [
+                { v: item.title, l: { Target: item.url } }, item.platform, item.status || "unsolved",
+                item.difficulty || "", item.timeTaken || "", (item.tags || []).join(", "),
+                item.feedback || "", new Date(item.updatedAt || item.createdAt || item.date).toLocaleDateString()
+            ]);
+            const sheet = XLSX.utils.aoa_to_sheet([["Title", "Platform", "Status", "Difficulty", "Time", "Tags", "Notes", "Updated"], ...rows]);
+            const book = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(book, sheet, "Problems");
+            XLSX.writeFile(book, "codeassist-bookmarks.xlsx");
+        } catch { toast("Excel export failed. Try JSON instead.", true); }
+        finally { button.disabled = false; button.textContent = label; }
     }
 
-    async function exportJson() {
-        const bookmarks = await getBookmarks();
-        if (!bookmarks.length) {
-            showStatus("No saved problems to back up.", true);
-            return;
-        }
+    function loadXlsx() {
+        if (globalThis.XLSX) return Promise.resolve();
+        return new Promise((resolve, reject) => {
+            const script = document.createElement("script");
+            script.src = chrome.runtime.getURL("xlsx.full.min.js");
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    }
 
-        const blob = new Blob([JSON.stringify(bookmarks, null, 2)], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement("a");
-        anchor.href = url;
-        anchor.download = "codeassist-backup.json";
-        anchor.click();
-        URL.revokeObjectURL(url);
+    function exportJson() {
+        if (!state.bookmarks.length) return toast("No saved problems to back up.", true);
+        const url = URL.createObjectURL(new Blob([JSON.stringify(state.bookmarks, null, 2)], { type: "application/json" }));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "codeassist-backup.json";
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    async function clearData() {
+        if (!confirm("Clear saved problems, notes, and Gemini settings?")) return;
+        await chrome.storage.local.clear();
+        await migrateBookmarks();
+        resetForm();
+        aiState("idle");
+        await loadSettings();
+        await refreshLibrary();
+        toast("All local CodeAssist data was cleared.");
     }
 
     async function getBookmarks() {
-        const data = await chrome.storage.local.get({
-            [STORAGE_KEY]: [],
-            [LEGACY_STORAGE_KEY]: []
-        });
-        return data[STORAGE_KEY].length ? data[STORAGE_KEY] : data[LEGACY_STORAGE_KEY];
+        const data = await chrome.storage.local.get({ [BOOKMARKS]: [] });
+        return Array.isArray(data[BOOKMARKS]) ? data[BOOKMARKS] : [];
+    }
+    function setBookmarks(items) {
+        return chrome.storage.local.set({ [BOOKMARKS]: items });
     }
 
-    async function setBookmarks(bookmarks) {
-        await chrome.storage.local.set({
-            [STORAGE_KEY]: bookmarks,
-            [LEGACY_STORAGE_KEY]: bookmarks
-        });
+    function toast(message, error = false) {
+        ui.status.hidden = false;
+        ui.status.className = `status-banner ${error ? "error" : "success"}`;
+        ui.status.textContent = message;
+        clearTimeout(toast.timer);
+        toast.timer = setTimeout(() => { ui.status.hidden = true; }, 3200);
     }
 
-    function showStatus(message, isError = false) {
-        elements.statusBanner.hidden = false;
-        elements.statusBanner.textContent = message;
-        elements.statusBanner.className = `status-banner ${isError ? "error" : "success"}`;
-        window.clearTimeout(showStatus.timer);
-        showStatus.timer = window.setTimeout(() => {
-            elements.statusBanner.hidden = true;
-        }, 2800);
+    function normalizeUrl(raw) {
+        try {
+            const url = new URL(raw);
+            url.hash = "";
+            url.search = "";
+            const leetcode = url.hostname.endsWith("leetcode.com") && url.pathname.match(/^(\/problems\/[^/]+\/)/);
+            if (leetcode) url.pathname = leetcode[1];
+            return url.toString();
+        } catch { return String(raw || ""); }
     }
 
-    function formatStatus(status) {
-        if (status === "solved") {
-            return "Solved";
-        }
-        if (status === "attempted") {
-            return "Attempted";
-        }
-        return "Not solved";
+    function safeUrl(raw) {
+        try { const url = new URL(raw); return url.protocol === "https:" ? escapeHtml(url.toString()) : "#"; }
+        catch { return "#"; }
     }
 
+    function cleanTitle(title, platform, url) {
+        const clean = String(title || "").replace(/\s+[|–—-]\s+(LeetCode|Codeforces|CodeChef|HackerRank|AtCoder|GeeksforGeeks).*$/i, "").trim();
+        if (clean && clean.toLowerCase() !== platform.toLowerCase()) return clean;
+        try { return new URL(url).pathname.split("/").filter(Boolean).pop().replace(/[-_]/g, " "); }
+        catch { return "Coding problem"; }
+    }
+
+    function errorText(error) {
+        const message = String(error?.message || error || "Unexpected error.");
+        if (/receiving end|establish connection/i.test(message)) return "Refresh the problem page and retry.";
+        if (/failed to fetch|networkerror/i.test(message)) return "Could not reach Gemini. Check your connection.";
+        return message;
+    }
+
+    function countBy(values) {
+        return values.reduce((counts, value) => {
+            counts[value] = (counts[value] || 0) + 1;
+            return counts;
+        }, {});
+    }
+    function statusLabel(status) {
+        return status === "solved" ? "Solved" : status === "attempted" ? "Attempted" : "Not solved";
+    }
+    function modelName(model) {
+        return String(model).replace(/^models\//, "").split("-")
+            .map((part) => ({ gemini: "Gemini", flash: "Flash", lite: "Lite", latest: "Latest" })[part] || part).join(" ");
+    }
     function escapeHtml(value) {
-        return String(value)
-            .replaceAll("&", "&amp;")
-            .replaceAll("<", "&lt;")
-            .replaceAll(">", "&gt;")
-            .replaceAll('"', "&quot;")
-            .replaceAll("'", "&#39;");
+        return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+            "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+        })[char]);
     }
+}
 
-    function escapeAttribute(value) {
-        return escapeHtml(value);
+function fatal(error) {
+    console.error("CodeAssist failed to initialize:", error);
+    const status = document.getElementById("status");
+    if (status) {
+        status.hidden = false;
+        status.className = "status-banner error";
+        status.textContent = "CodeAssist could not start. Reload the extension.";
     }
-});
+}
+
+function normalizeMath(value) {
+    let text = String(value || "")
+        .replace(/\$\$([\s\S]*?)\$\$/g, "$1")
+        .replace(/\$([^$\n]+)\$/g, "$1")
+        .replace(/\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g, "($1)/($2)")
+        .replace(/\\sqrt\s*\{([^{}]+)\}/g, "√($1)")
+        .replace(/\\text\s*\{([^{}]*)\}/g, "$1");
+    const symbols = {
+        "\\geq": "≥", "\\ge": "≥", "\\leq": "≤", "\\le": "≤", "\\neq": "≠",
+        "\\times": "×", "\\cdot": "·", "\\div": "÷", "\\pm": "±", "\\infty": "∞",
+        "\\in": "∈", "\\notin": "∉", "\\mid": "∣", "\\sum": "Σ", "\\prod": "Π",
+        "\\rightarrow": "→", "\\Rightarrow": "⇒", "\\log": "log", "\\min": "min", "\\max": "max"
+    };
+    for (const [latex, symbol] of Object.entries(symbols)) text = text.replaceAll(latex, symbol);
+    return text
+        .replace(/\\(?:left|right)/g, "")
+        .replace(/\\[()[\]]/g, "")
+        .replace(/\\[,;:!]/g, " ")
+        .replace(/\\_/g, "_")
+        .replace(/\\([A-Za-z]+)/g, "$1")
+        .replace(/\{([^{}\n]+)\}/g, "$1")
+        .replace(/\$/g, "")
+        .replace(/[ \t]{2,}/g, " ")
+        .trim();
+}

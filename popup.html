@@ -4,45 +4,118 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CodeAssist</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="app-shell">
-        <header class="app-header">
-            <div>
-                <p class="eyebrow">CodeAssist</p>
-                <h1>Track problems without leaving the page</h1>
-            </div>
-            <div class="header-note" id="headerNote">Gemini ready</div>
-        </header>
+        <div class="app-topbar">
+            <header class="app-header">
+                <div class="brand" aria-label="CodeAssist">
+                    <span class="brand-mark" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none">
+                            <path d="m9 7-5 5 5 5M15 7l5 5-5 5" />
+                            <path d="m14 4-4 16" />
+                        </svg>
+                    </span>
+                    <span class="brand-copy">
+                        <span class="brand-name">CodeAssist</span>
+                        <span class="brand-description">Practice companion</span>
+                    </span>
+                </div>
+                <span class="connection-state" id="headerNote">Gemini ready</span>
+            </header>
 
-        <nav class="tab-buttons" aria-label="Sections">
-            <button class="tab-btn active" data-tab="tab-problem" type="button">Problem</button>
-            <button class="tab-btn" data-tab="tab-library" type="button">Library</button>
-            <button class="tab-btn" data-tab="tab-settings" type="button">Settings</button>
-        </nav>
+            <nav class="tab-buttons" role="tablist" aria-label="CodeAssist sections">
+                <button
+                    class="tab-btn active"
+                    id="problemTab"
+                    data-tab="tab-problem"
+                    type="button"
+                    role="tab"
+                    aria-selected="true"
+                    aria-controls="tab-problem"
+                >Problem</button>
+                <button
+                    class="tab-btn"
+                    id="libraryTab"
+                    data-tab="tab-library"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="tab-library"
+                >Library</button>
+                <button
+                    class="tab-btn"
+                    id="settingsTab"
+                    data-tab="tab-settings"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="tab-settings"
+                >Settings</button>
+            </nav>
+        </div>
 
-        <main>
-            <section id="tab-problem" class="tab-content active">
-                <section class="card problem-card">
+        <div id="status" class="status-banner" role="status" aria-live="polite" aria-atomic="true" hidden></div>
+
+        <main class="app-content">
+            <section
+                id="tab-problem"
+                class="tab-content active"
+                role="tabpanel"
+                aria-labelledby="problemTab"
+                tabindex="0"
+            >
+                <section class="panel problem-card" aria-labelledby="problemTitle">
                     <div class="problem-head">
-                        <div>
-                            <p class="section-label">Current page</p>
-                            <h2 class="problem-title" id="problemTitle">Loading problem...</h2>
+                        <div class="problem-copy">
+                            <p class="section-label">Current problem</p>
+                            <h1 class="problem-title" id="problemTitle">Loading problem...</h1>
                         </div>
                         <div class="problem-meta" id="problemMeta"></div>
                     </div>
                     <p class="problem-subtext" id="problemSubtext">Open a supported coding problem to save notes and ask for focused help.</p>
                 </section>
 
-                <div id="status" class="status-banner" hidden></div>
+                <section class="panel ai-card" id="ai-section" aria-labelledby="aiSectionTitle">
+                    <div class="section-head">
+                        <div>
+                            <p class="section-label">Gemini</p>
+                            <h2 id="aiSectionTitle">How can I help?</h2>
+                        </div>
+                        <span class="section-hint">No full solutions</span>
+                    </div>
 
-                <form id="bookmarkForm" class="stack">
-                    <section class="card">
-                        <div class="two-col">
+                    <div class="ai-buttons" aria-label="Gemini actions">
+                        <button class="btn ai-btn" id="getHintsBtn" type="button">Hints</button>
+                        <button class="btn ai-btn" id="getComplexityBtn" type="button">Complexity</button>
+                        <button class="btn ai-btn" id="getApproachesBtn" type="button">Approaches</button>
+                        <button class="btn ai-btn" id="getConceptBtn" type="button">Concepts</button>
+                    </div>
+
+                    <div class="ai-output" id="aiOutput" aria-busy="false">
+                        <div class="ai-output-head">
+                            <span id="aiResultTitle">Response</span>
+                            <div class="ai-output-actions">
+                                <button class="text-btn" id="copyAiBtn" type="button" hidden>Copy</button>
+                                <button class="text-btn" id="retryAiBtn" type="button" hidden>Retry</button>
+                            </div>
+                        </div>
+                        <div id="aiResult" class="result-panel" role="status" aria-live="polite">Choose an action for a concise, problem-specific breakdown.</div>
+                    </div>
+                </section>
+
+                <form id="bookmarkForm" class="progress-form">
+                    <section class="panel" aria-labelledby="progressTitle">
+                        <div class="section-head progress-heading">
+                            <div>
+                                <p class="section-label">Your progress</p>
+                                <h2 id="progressTitle">Notes &amp; tracking</h2>
+                            </div>
+                            <span class="section-hint">Saved locally</span>
+                        </div>
+
+                        <div class="form-grid">
                             <div class="field">
                                 <label for="status-select">Status</label>
                                 <select id="status-select">
@@ -53,61 +126,64 @@
                             </div>
                             <div class="field">
                                 <label for="difficulty">Difficulty</label>
-                                <input type="text" id="difficulty" placeholder="Easy, Medium, Hard">
+                                <select id="difficulty">
+                                    <option value="">Select difficulty</option>
+                                    <option value="Easy">Easy</option>
+                                    <option value="Medium">Medium</option>
+                                    <option value="Hard">Hard</option>
+                                </select>
                             </div>
-                        </div>
-
-                        <div class="two-col">
                             <div class="field">
-                                <label for="timeTaken">Time spent (minutes)</label>
-                                <input type="text" id="timeTaken" inputmode="numeric" placeholder="45">
+                                <label for="timeTaken">Time (minutes)</label>
+                                <input type="number" id="timeTaken" inputmode="numeric" min="0" step="1" placeholder="45">
                             </div>
                             <div class="field field-check">
-                                <label for="needsRevision">Revision</label>
-                                <label class="checkbox">
-                                    <input type="checkbox" id="needsRevision">
-                                    <span>Review this again later</span>
+                                <span class="field-label">Revision</span>
+                                <label class="switch-row" for="needsRevision">
+                                    <span>Review later</span>
+                                    <span class="switch">
+                                        <input type="checkbox" id="needsRevision">
+                                        <span class="switch-track" aria-hidden="true"></span>
+                                    </span>
                                 </label>
                             </div>
                         </div>
 
-                        <div class="field">
+                        <div class="field field-block">
                             <label for="tagInput">Tags</label>
-                            <input type="text" id="tagInput" placeholder="Type a tag and press Enter">
-                            <div class="tag-input-container" id="tagContainer"></div>
+                            <input type="text" id="tagInput" placeholder="e.g. Dynamic programming" autocomplete="off">
+                            <span class="field-help">Press Enter to add a tag.</span>
+                            <div class="tag-input-container" id="tagContainer" aria-live="polite"></div>
                         </div>
 
-                        <div class="field">
+                        <div class="field field-block">
                             <label for="feedback">Notes</label>
-                            <textarea id="feedback" placeholder="Write the trick, edge case, or pattern you want to remember"></textarea>
+                            <textarea id="feedback" placeholder="Capture the key idea, edge case, or mistake to remember"></textarea>
                         </div>
 
-                        <button type="submit" class="btn btn-primary" id="saveBtn">Save problem</button>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="saveBtn">Save problem</button>
+                        </div>
                     </section>
                 </form>
-
-                <section class="card ai-card" id="ai-section">
-                    <div class="section-head">
-                        <div>
-                            <p class="section-label">Gemini help</p>
-                            <h3>Quick assistance</h3>
-                        </div>
-                        <p class="muted">Focused guidance, not full code dumps.</p>
-                    </div>
-
-                    <div class="ai-buttons">
-                        <button class="btn btn-secondary ai-btn" id="getHintsBtn" type="button">Hints</button>
-                        <button class="btn btn-secondary ai-btn" id="getComplexityBtn" type="button">Complexity</button>
-                        <button class="btn btn-secondary ai-btn" id="getApproachesBtn" type="button">Approaches</button>
-                        <button class="btn btn-secondary ai-btn" id="getConceptBtn" type="button">Concepts</button>
-                    </div>
-
-                    <div id="aiResult" class="result-panel">Choose an action to get a concise breakdown.</div>
-                </section>
             </section>
 
-            <section id="tab-library" class="tab-content">
-                <section class="card stats-card">
+            <section
+                id="tab-library"
+                class="tab-content"
+                role="tabpanel"
+                aria-labelledby="libraryTab"
+                tabindex="0"
+            >
+                <div class="page-heading">
+                    <div>
+                        <p class="section-label">Library</p>
+                        <h1>Saved problems</h1>
+                    </div>
+                    <span class="page-heading-copy">Your practice history</span>
+                </div>
+
+                <section class="panel stats-card" aria-label="Practice summary">
                     <div class="mini-stat">
                         <span class="mini-stat-value" id="totalProblems">0</span>
                         <span class="mini-stat-label">Saved</span>
@@ -118,42 +194,51 @@
                     </div>
                     <div class="mini-stat">
                         <span class="mini-stat-value" id="revisionCount">0</span>
-                        <span class="mini-stat-label">Revision</span>
+                        <span class="mini-stat-label">To revise</span>
                     </div>
                 </section>
 
-                <section class="card">
-                    <div class="filter-row">
-                        <select id="platformFilter">
-                            <option value="all">All platforms</option>
-                            <option value="LeetCode">LeetCode</option>
-                            <option value="Codeforces">Codeforces</option>
-                            <option value="CodeChef">CodeChef</option>
-                            <option value="HackerRank">HackerRank</option>
-                            <option value="AtCoder">AtCoder</option>
-                            <option value="GeeksforGeeks">GeeksforGeeks</option>
-                        </select>
-                        <select id="statusFilter">
-                            <option value="all">All status</option>
-                            <option value="solved">Solved</option>
-                            <option value="attempted">Attempted</option>
-                            <option value="unsolved">Not solved</option>
-                        </select>
+                <section class="panel library-panel" aria-label="Problem library">
+                    <div class="search-field">
+                        <label class="sr-only" for="librarySearch">Search saved problems</label>
+                        <input type="search" id="librarySearch" placeholder="Search titles, notes, or tags" autocomplete="off">
                     </div>
 
-                    <div class="action-row">
-                        <button class="btn btn-secondary" id="exportBtn" type="button">Export Excel</button>
-                        <button class="btn btn-secondary" id="exportJsonBtn" type="button">Backup JSON</button>
+                    <div class="library-toolbar">
+                        <div class="filter-row">
+                            <label class="sr-only" for="platformFilter">Filter by platform</label>
+                            <select id="platformFilter" aria-label="Filter by platform">
+                                <option value="all">All platforms</option>
+                                <option value="LeetCode">LeetCode</option>
+                                <option value="Codeforces">Codeforces</option>
+                                <option value="CodeChef">CodeChef</option>
+                                <option value="HackerRank">HackerRank</option>
+                                <option value="AtCoder">AtCoder</option>
+                                <option value="GeeksforGeeks">GeeksforGeeks</option>
+                            </select>
+                            <label class="sr-only" for="statusFilter">Filter by status</label>
+                            <select id="statusFilter" aria-label="Filter by status">
+                                <option value="all">All statuses</option>
+                                <option value="solved">Solved</option>
+                                <option value="attempted">Attempted</option>
+                                <option value="unsolved">Not solved</option>
+                            </select>
+                        </div>
+
+                        <div class="action-row" aria-label="Export library">
+                            <button class="btn btn-compact" id="exportBtn" type="button" title="Export as Excel">Excel</button>
+                            <button class="btn btn-compact" id="exportJsonBtn" type="button" title="Back up as JSON">JSON</button>
+                        </div>
                     </div>
 
-                    <div class="bookmark-list" id="bookmarksList"></div>
+                    <div class="bookmark-list" id="bookmarksList" aria-live="polite"></div>
                 </section>
 
-                <section class="card insights-card">
+                <section class="panel insights-card" aria-labelledby="insightsTitle">
                     <div class="section-head">
                         <div>
-                            <p class="section-label">Patterns</p>
-                            <h3>What you are practicing</h3>
+                            <p class="section-label">Insights</p>
+                            <h2 id="insightsTitle">Practice patterns</h2>
                         </div>
                     </div>
                     <div id="platformStats" class="stack compact"></div>
@@ -161,25 +246,48 @@
                 </section>
             </section>
 
-            <section id="tab-settings" class="tab-content">
-                <section class="card">
+            <section
+                id="tab-settings"
+                class="tab-content"
+                role="tabpanel"
+                aria-labelledby="settingsTab"
+                tabindex="0"
+            >
+                <div class="page-heading">
+                    <div>
+                        <p class="section-label">Settings</p>
+                        <h1>Gemini connection</h1>
+                    </div>
+                    <span class="page-heading-copy">Stored on this device</span>
+                </div>
+
+                <section class="panel settings-panel" aria-labelledby="connectionTitle">
                     <div class="section-head">
                         <div>
-                            <p class="section-label">Gemini API</p>
-                            <h3>Connection settings</h3>
+                            <h2 id="connectionTitle">API credentials</h2>
+                            <p class="section-description">Connect your own Gemini API key to generate guidance.</p>
                         </div>
                     </div>
 
-                    <div class="field">
+                    <div class="field field-block">
                         <label for="apiKey">API key</label>
-                        <input type="password" id="apiKey" placeholder="Paste your Gemini API key">
+                        <div class="input-action-row">
+                            <input type="password" id="apiKey" placeholder="Paste your Gemini API key" autocomplete="off" spellcheck="false">
+                            <button class="btn btn-compact" id="toggleApiKeyBtn" type="button" aria-pressed="false">Show</button>
+                        </div>
+                        <div class="api-meta-row">
+                            <span class="api-status" id="apiStatus" role="status" aria-live="polite">Connection not tested</span>
+                            <a class="text-link" href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Get an API key</a>
+                        </div>
                     </div>
 
-                    <div class="two-col">
+                    <div class="form-grid settings-grid">
                         <div class="field">
                             <label for="geminiModel">Model</label>
                             <select id="geminiModel">
                                 <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
+                                <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+                                <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash Lite</option>
                                 <option value="gemini-flash-latest">Gemini Flash Latest</option>
                             </select>
                         </div>
@@ -192,38 +300,30 @@
                         </div>
                     </div>
 
-                    <button class="btn btn-primary" id="saveApiBtn" type="button">Save settings</button>
-                    <p class="helper-text">Get your key from Google AI Studio. The extension stores it locally in Chrome storage.</p>
+                    <div class="settings-actions">
+                        <button class="btn" id="testApiBtn" type="button">Test connection</button>
+                        <button class="btn btn-primary" id="saveApiBtn" type="button">Save settings</button>
+                    </div>
                 </section>
 
-                <section class="card">
-                    <div class="section-head">
-                        <div>
-                            <p class="section-label">Notes</p>
-                            <h3>How this build works</h3>
-                        </div>
+                <section class="panel privacy-card" aria-labelledby="privacyTitle">
+                    <div>
+                        <h2 id="privacyTitle">Local by default</h2>
+                        <p>Your key, saved problems, and notes stay in Chrome's local storage. A problem statement is sent to Gemini only when you request help.</p>
                     </div>
-                    <ul class="notes-list">
-                        <li>Uses the current Gemini API flow and defaults to the stable `gemini-3.6-flash` model.</li>
-                        <li>Keeps responses concise so the popup feels useful instead of noisy.</li>
-                        <li>Preserves older saved bookmarks and upgrades them into the new storage key automatically.</li>
-                    </ul>
                 </section>
 
-                <section class="card danger-card">
-                    <div class="section-head">
-                        <div>
-                            <p class="section-label">Reset</p>
-                            <h3>Clear local extension data</h3>
-                        </div>
+                <section class="panel danger-card" aria-labelledby="dangerTitle">
+                    <div class="danger-copy">
+                        <h2 id="dangerTitle">Clear local data</h2>
+                        <p>Remove saved problems, notes, and settings from this browser.</p>
                     </div>
-                    <button class="btn btn-danger" id="clearAllBtn" type="button">Clear all data</button>
+                    <button class="btn btn-danger" id="clearAllBtn" type="button">Clear data</button>
                 </section>
             </section>
         </main>
     </div>
 
-    <script src="xlsx.full.min.js"></script>
     <script src="popup.js"></script>
 </body>
 </html>
